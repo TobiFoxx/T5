@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Station Übersicht</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0; background-color: #2c2c2c; color: #f1f1f1;
+      display: flex;
+      min-height: 100vh; /* Sidebar immer bis unten */
+    }
+    .sidebar {
+      width: 200px; background-color: #1f1f1f; padding: 20px 10px;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh; /* Sidebar immer bis unten */
+    }
+    .sidebar h2 { color: #f1c40f; font-size: 38px; text-align: center; margin-bottom: 10px; }
+    .datetime {
+      font-size: 22px; font-weight: bold; text-align: center;
+      margin-bottom: 20px; line-height: 1.6;
+    }
+    .sidebar button {
+      width:100%; padding:10px; margin-bottom:10px;
+      border:none; background:#f1c40f; color:#2c2c2c;
+      border-radius:6px; cursor:pointer;
+      font-size:16px; font-weight:bold;
+    }
+    .sidebar button:hover { background:#d4ac0d; }
+    .pulsing-red {
+      animation: pulse-red 1.5s infinite;
+      background:#e74c3c!important; color:#fff!important;
+    }
+    @keyframes pulse-red {
+      0% {box-shadow:0 0 0 0 rgba(231,76,60,0.7);}
+      70% {box-shadow:0 0 0 10px rgba(231,76,60,0);}
+     100% {box-shadow:0 0 0 0 rgba(231,76,60,0);}
+    }
+    .pulsing-green { animation: pulse-green 1.5s infinite; }
+    @keyframes pulse-green {
+      0% {box-shadow:0 0 0 0 rgba(39,174,96,0.7);}
+     70% {box-shadow:0 0 0 10px rgba(39,174,96,0);}
+     100% {box-shadow:0 0 0 0 rgba(39,174,96,0);}
+    }
+    .pulsing-green-slow { animation: pulse-green-slow 6s infinite; }
+    @keyframes pulse-green-slow {
+      0% { box-shadow: 0 0 0 0 rgba(39,174,96,0.7);}
+      70% { box-shadow: 0 0 0 16px rgba(39,174,96,0);}
+      100% { box-shadow: 0 0 0 0 rgba(39,174,96,0);}
+    }
+    .content { flex:1; padding:10px; }
+    .card {
+      background:#3a3a3a; border-radius:8px; padding:10px; margin:6px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: flex-start;
+    }
+    .room-title {
+      font-size:18px; font-weight:bold; color:#f1c40f;
+      margin-bottom:8px;
+      min-width: 60px;
+      margin-right: 12px;
+    }
+    .info-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .room-cards {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+      gap:10px; margin-top:10px;
+    }
+    .yellow-button {
+      background:#f1c40f; color:#2c2c2c; border:none;
+      padding:8px 12px; border-radius:6px;
+      cursor:pointer; font-size:14px; font-weight:bold;
+    }
+    .yellow-button:hover { background:#d4ac0d; }
+    .yellow-input {
+      padding:8px; border-radius:4px; border:1px solid #666;
+      background:#3c3c3c; color:#f1f1f1;
+      max-width:200px; width:100%; box-sizing:border-box;
+    }
+    .matrix {
+      display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;
+    }
+    .matrix button {
+      width: 180px;
+      min-width: 180px;
+      height: 40px;
+      padding: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: inline-block;
+    }
+    .frei { background:#27ae60; color:white; }
+    .frei.pulsing-green { animation:pulse-green 1.5s infinite; }
+    .belegt { background:#f1c40f; color:#2c2c2c; }
+    .pulsing-red-slow {
+      animation: pulse-red-slow 6s infinite;
+      background: #e74c3c !important;
+      color: #fff !important;
+    }
+    @keyframes pulse-red-slow {
+      0% { box-shadow: 0 0 0 0 rgba(231,76,60,0.7);}
+      70% { box-shadow: 0 0 0 16px rgba(231,76,60,0);}
+      100% { box-shadow: 0 0 0 0 rgba(231,76,60,0);}
+    }
+    @media print {
+      body { background:white; color:black;}
+      .sidebar, .content > *:not(.druckansicht) {
+        display:none!important;
+      }
+      .druckansicht {
+        display:block!important; font-size:14px;
+        padding:10px; text-align:left;
+      }
+      .druck-gross { font-size:20px!important; }
+      button { display:none!important; }
+    }
+#formOverlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#formOverlayContent {
+  background: #3a3a3a;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 600px;
+  width: 90%;
+  color: #fff;
+  box-shadow: 0 0 15px rgba(0,0,0,0.5);
+  overflow-y: auto;
+  max-height: 90vh;
+}
+.zimmerwechsel-btn {
+  width: 170px;
+  height: 40px;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  font-size: 15px;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 0;
+  padding: 8px 10px;
+}
+  </style>
+</head>
+<body>
+  <!-- Overlay für allgemeine Hinweise -->
+  <div id="overlay" style="display:none; position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center;">
+    <div id="overlayContent" style="padding:20px;border-radius:8px;max-width:400px;text-align:center;"></div>
+  </div>
+  <!-- Patientenformular-Overlay -->
+  <div id="formOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+    <div id="formOverlayContent">
+      <form id="editForm" onsubmit="event.preventDefault(); savePatientData();" style="display:block;">
+        <h4 id="formHeader" style="color:#f1c40f; margin-bottom:16px;">Patientendaten</h4>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px 18px; margin-bottom:10px;">
+          <label for="inputLastName" style="grid-column:1/2;">Nachname</label>
+          <input type="text" id="inputLastName" class="yellow-input" style="grid-column:2/3;">
+          <label for="inputFirstName" style="grid-column:1/2;">Vorname</label>
+          <input type="text" id="inputFirstName" class="yellow-input" style="grid-column:2/3;">
+          <label for="inputAdmission" style="grid-column:1/2;">Aufnahmedatum</label>
+          <input type="date" id="inputAdmission" class="yellow-input" style="grid-column:2/3;">
+          <label for="inputDischarge" style="grid-column:1/2;">Geplantes Entlassdatum</label>
+          <input type="date" id="inputDischarge" class="yellow-input" style="grid-column:2/3;">
+          <label for="inputDiagnosis" style="grid-column:1/2;">Diagnose</label>
+          <input type="text" id="inputDiagnosis" class="yellow-input" style="grid-column:2/3;">
+          <label for="inputCareDropdown" style="grid-column:1/2;">Pflegekraft</label>
+          <select id="inputCareDropdown" class="yellow-input" style="grid-column:2/3;"></select>
+          <label for="inputEval" style="grid-column:1/2;">Evaluationsdatum</label>
+          <input type="date" id="inputEval" class="yellow-input" style="grid-column:2/3;">
+          <label for="inputDietSelect" style="grid-column:1/2;">Kostform</label>
+          <div style="grid-column:2/3; display:flex; flex-direction:column; gap:4px;">
+            <label for="inputDiet" style="grid-column:1/2;">Kostform</label>
+            <input type="text" id="inputDiet" class="yellow-input" list="kostformListe" style="grid-column:2/3;">
+            <datalist id="kostformListe">
+              <option value="Normal">
+              <option value="Vegetarisch">
+              <option value="Vegan">
+              <option value="Schweinefleischfrei">
+              <option value="Sonderkost">
+            </datalist>
+          </div>
+          <label for="inputInfo" style="grid-column:1/2;">Info</label>
+          <textarea id="inputInfo" class="yellow-input" style="grid-column:2/3; min-height:40px;"></textarea>
+          <label for="inputGroup" style="grid-column:1/2;">Gruppennummer</label>
+          <select id="inputGroup" class="yellow-input" style="grid-column:2/3;">
+            <option value="">-</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:10px; justify-content:flex-start;">
+          <button type="submit" class="yellow-button" style="background:#f1c40f; color:#2c2c2c;">Speichern</button>
+          <button type="button" class="yellow-button" onclick="hideFormOverlay()">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="sidebar">
+    <h2>Track 5</h2>
+    <div class="datetime" id="datetime"></div>
+    <button onclick="showSection('overview')">Übersicht</button>
+    <button onclick="showSection('edit')">Orga</button>
+    <button onclick="showSection('druck')">Druckoptionen</button>
+    <button onclick="showSection('mitarbeiter')">Mitarbeitende</button>
+    <button id="zimmerwechselBtn" class="yellow-button" onclick="startZimmerwechsel()">Zimmerwechsel</button>
+    <button id="entlassenBtn" class="yellow-button" onclick="startEntlassung()">Pat. entlassen</button>
+
+  </div>
+  <div class="content">
+    <!-- Übersicht -->
+    <div id="overview">
+      <div id="cardsContainer"></div>
+    </div>
+    <!-- Bearbeiten -->
+    <div id="edit" style="display:none;">
+      <h3>Orga</h3>
+      <div class="room-cards" id="matrixContainer"></div>
+    </div>
+    <!-- Druckoptionen -->
+    <div id="druck" style="display:none; text-align:left;">
+      <h3>Druckoptionen</h3>
+      <button class="yellow-button" onclick="printUebersicht()">Patientenübersicht (Querformat)</button>
+      <button class="yellow-button" onclick="printStationGross()">Stationsübersicht (Hochformat)</button>
+    </div>
+    <!-- Mitarbeiter -->
+    <div id="mitarbeiter" style="display:none;">
+      <h3>Mitarbeitende</h3>
+      <div id="mitarbeiterInputCard" style="background:#3a3a3a; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.3); padding:12px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; width:260px; height:48px;">
+    <input type="text" id="neuerMitarbeiter" class="yellow-input" placeholder="Neuer Mitarbeiter" style="flex:1; margin-right:10px; min-width:0;">
+    <button class="yellow-button" onclick="addMitarbeiter()" style="padding:4px 12px;">Speichern</button>
+  </div>
+  <ul id="mitarbeiterListe" style="list-style:none; padding-left:0; margin:0;"></ul>
+    </div>
+  </div>
+<script>
+  // Hilfsfunktion für TT.MM.-Format
+  function formatDateDM(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + '.';
+  }
+
+  // Datenstrukturen & Laden aus localStorage
+  const patientData = {};
+  const mitarbeiter = [];
+  const storedPatients = localStorage.getItem('patientData');
+  if (storedPatients) Object.assign(patientData, JSON.parse(storedPatients));
+  const storedMitarbeiter = localStorage.getItem('mitarbeiter');
+  if (storedMitarbeiter) mitarbeiter.push(...JSON.parse(storedMitarbeiter));
+
+  let currentEditKey = null;
+  let wechselBuffer = null;
+
+  const zimmerConfig = {
+    "19": 2, "16": 1, "15": 1, "14": 1, "13": 1,
+    "12": 2, "11": 1, "10": 2, "9": 1, "8": 2,
+    "7": 1, "6": 1, "5": 2
+  };
+  const sortedZimmer = Object.entries(zimmerConfig).sort((a,b)=>b[0]-a[0]);
+  const container = document.getElementById('cardsContainer');
+  const matrixContainer = document.getElementById('matrixContainer');
+
+  function setToday(fieldId) {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById(fieldId).value = today;
+  }
+  function setDiet(value) {
+    document.getElementById('inputDiet').value = value;
+  }
+
+  // Bereiche wechseln
+  function showSection(sec) {
+    ['overview','edit','druck','mitarbeiter'].forEach(id => {
+      document.getElementById(id).style.display = (id===sec?'block':'none');
+    });
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.classList.remove('pulsing-red');
+    if (sec==='overview') renderOverview();
+    if (sec==='edit') renderMatrix();
+    if (sec==='mitarbeiter') renderMitarbeiterListe();
+  }
+
+  // Overlay
+  function overlay(html) {
+    document.getElementById('overlayContent').innerHTML = html;
+    document.getElementById('overlay').style.display = 'flex';
+  }
+  function closeOverlay() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('overlayContent').innerHTML = '';
+    wechselBuffer = null;
+  }
+  document.getElementById('overlay').addEventListener('click', e => {
+    if (e.target.id==='overlay') closeOverlay();
+  });
+
+  // Mitarbeiterverwaltung
+  function renderMitarbeiterListe() {
+  const ul = document.getElementById('mitarbeiterListe');
+  ul.innerHTML = '';
+  mitarbeiter.forEach((m, i) => {
+    // Karte für jede Person
+    const card = document.createElement('div');
+    card.style.background = '#3a3a3a';
+    card.style.borderRadius = '8px';
+    card.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+    card.style.padding = '12px 16px';
+    card.style.marginBottom = '10px';
+    card.style.display = 'flex';
+    card.style.alignItems = 'center';
+    card.style.justifyContent = 'space-between';
+    card.style.width = '260px';         // Feste Breite
+    card.style.height = '48px';         // Feste Höhe
+    card.style.overflow = 'hidden';     // Kein Überlauf
+
+    const name = document.createElement('span');
+    name.textContent = m;
+    name.style.fontSize = '17px';
+    name.style.fontWeight = 'bold';
+    name.style.color = '#f1c40f';
+    name.style.whiteSpace = 'nowrap';         // Kein Umbruch
+    name.style.overflow = 'hidden';           // Abschneiden
+    name.style.textOverflow = 'ellipsis';     // "..."
+
+    const btn = document.createElement('button');
+    btn.className = 'yellow-button';
+    btn.style.padding = '4px 12px';
+    btn.textContent = 'Entfernen';
+    btn.onclick = () => removeMitarbeiter(i);
+
+    card.appendChild(name);
+    card.appendChild(btn);
+    ul.appendChild(card);
+  });
+}
+  function addMitarbeiter() {
+    const inp = document.getElementById('neuerMitarbeiter'), name = inp.value.trim();
+    if (name) {
+      mitarbeiter.push(name);
+      localStorage.setItem('mitarbeiter', JSON.stringify(mitarbeiter));
+      inp.value='';
+      renderMitarbeiterListe();
+      updatePflegekraftDropdown();
+    } else {
+      overlay('<p>Bitte Namen eingeben.</p>');
+    }
+  }
+  function removeMitarbeiter(i) {
+    mitarbeiter.splice(i,1);
+    localStorage.setItem('mitarbeiter', JSON.stringify(mitarbeiter));
+    renderMitarbeiterListe();
+    updatePflegekraftDropdown();
+  }
+
+  // Druckfunktionen
+  function printUebersicht() {
+    const div = document.createElement('div'); div.className='druckansicht';
+    sortedZimmer.forEach(([z,p]) => {
+      const box = document.createElement('div');
+      box.innerHTML = `<h4>Zi ${z}</h4>`;
+      for (let i=0; i<p; i++) {
+        const key = `${z}_${i}`, d = patientData[key],
+              L = p===2?(i===0?'Fenster':'Wand'):'Bett';
+        box.innerHTML += `<div><strong>${L}:</strong> ${d?`${d.lastName}, ${d.firstName} | Diag:${d.diagnosis}`:'Bett frei'}</div>`;
+      }
+      div.appendChild(box);
+    });
+    document.body.appendChild(div);
+    window.print();
+    document.body.removeChild(div);
+  }
+  function printStationGross() {
+    const div = document.createElement('div'); div.className='druckansicht druck-gross';
+    sortedZimmer.forEach(([z,p]) => {
+      const box = document.createElement('div');
+      box.innerHTML = `<h3>Zi ${z}</h3>`;
+      for (let i=0; i<p; i++) {
+        const key = `${z}_${i}`, d = patientData[key],
+              L = p===2?(i===0?'Fenster':'Wand'):'Bett';
+        box.innerHTML += `<div><strong>${L}:</strong> ${d?`${d.lastName}, ${d.firstName}`:'Bett frei'}</div>`;
+      }
+      div.appendChild(box);
+    });
+    document.body.appendChild(div);
+    window.print();
+    document.body.removeChild(div);
+  }
+
+  // Matrix im Bearbeitungsmodus
+  function renderMatrix() {
+    matrixContainer.innerHTML = '';
+    sortedZimmer.forEach(([z,p]) => {
+      const card = document.createElement('div'); card.className='card';
+      card.innerHTML = `<div class="room-title">Zi ${z}</div>`;
+      const m = document.createElement('div'); m.className='matrix';
+      for (let i=0; i<p; i++) {
+        const key = `${z}_${i}`, d = patientData[key];
+        const btn = document.createElement('button');
+        if (d) {
+          btn.className = 'belegt';
+          btn.textContent = `${d.lastName}, ${d.firstName}`;
+        } else {
+          btn.className = 'frei pulsing-green-slow';
+          btn.textContent = 'Bett frei';
+        }
+        btn.onclick = () => openEditForm(key,z,i);
+        m.appendChild(btn);
+      }
+      card.appendChild(m);
+      matrixContainer.appendChild(card);
+    });
+  }
+
+  // Entlassung & Zimmerwechsel
+  function startEntlassung() {
+    let html = `
+    <div style="
+      background:#3a3a3a;
+      color:#fff;
+      border-radius:10px;
+      max-width:400px;
+      margin:auto;
+      box-shadow:0 0 15px rgba(0,0,0,0.5);
+      padding:24px 18px 18px 18px;
+      text-align:left;
+      font-size:16px;
+    ">
+      <h3 style="color:#f1c40f; margin-top:0;">Patient entlassen</h3>
+      <p style="margin-bottom:14px;">Wähle Patienten:</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+  `;
+  for (let key in patientData) {
+    const d = patientData[key];
+    if (d) {
+      let label = `${d.lastName}, ${d.firstName}`;
+      html += `<button class="yellow-button zimmerwechsel-btn" onclick="confirmEntlassung('${key}')">${label}</button>`;
+    }
+  }
+  html += `
+      </div>
+    </div>
+  `;
+  overlay(html);
+  }
+  function confirmEntlassung(key) {
+    const d = patientData[key];
+    const name = d ? `${d.lastName}, ${d.firstName}` : '';
+    overlay(`
+      <div style="
+        background:#3a3a3a;
+        color:#fff;
+        border-radius:10px;
+        max-width:400px;
+        margin:auto;
+        box-shadow:0 0 15px rgba(0,0,0,0.5);
+        padding:24px 18px 18px 18px;
+        text-align:left;
+        font-size:16px;
+      ">
+        <h3 style="color:#f1c40f; margin-top:0;">Patient entlassen</h3>
+        <p>Möchten Sie <b>${name}</b> wirklich entlassen?</p>
+        <div style="display:flex; gap:12px; margin-top:18px;">
+          <button class="yellow-button" onclick="doEntlassung('${key}')">Ja, entlassen</button>
+          <button class="yellow-button" onclick="closeOverlay()">Abbrechen</button>
+        </div>
+      </div>
+    `);
+  }
+  function doEntlassung(key) {
+    patientData[key] = null;
+    localStorage.setItem('patientData', JSON.stringify(patientData));
+    renderMatrix(); renderOverview(); closeOverlay();
+  }
+  function startZimmerwechsel() {
+    wechselBuffer = null;
+    let html = `
+  <div style="
+    background:#3a3a3a;
+    color:#fff;
+    border-radius:10px;
+    max-width:400px;
+    margin:auto;
+    box-shadow:0 0 15px rgba(0,0,0,0.5);
+    padding:24px 18px 18px 18px;
+    text-align:left;
+    font-size:16px;
+  ">
+    <h3 style="color:#f1c40f; margin-top:0;">Zimmerwechsel</h3>
+    <p style="margin-bottom:14px;">Wähle Ausgang:</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+`;
+    for (let key in patientData) {
+  const d = patientData[key];
+  if (d) {
+    let label = `${d.lastName}, ${d.firstName}`;
+    html += `<button class="yellow-button zimmerwechsel-btn" onclick="pickWechsel('${key}')">${label}</button>`;
+  }
+}
+html += `
+    </div>
+  </div>
+`;
+    overlay(html);
+  }
+  function pickWechsel(key) {
+    if (!wechselBuffer) {
+      wechselBuffer = key;
+      let html = `
+      <div style="
+        background:#3a3a3a;
+        color:#fff;
+        border-radius:10px;
+        max-width:400px;
+        margin:auto;
+        box-shadow:0 0 15px rgba(0,0,0,0.5);
+        padding:24px 18px 18px 18px;
+        text-align:left;
+        font-size:16px;
+      ">
+        <h3 style="color:#f1c40f; margin-top:0;">Zimmerwechsel</h3>
+        <p style="margin-bottom:14px;">Wähle Ziel:</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+    `;
+    for (let k in patientData) {
+      if (k !== wechselBuffer) {
+        const d = patientData[k];
+        let label, btnClass;
+        if (d) {
+          label = `${d.lastName}, ${d.firstName}`;
+          btnClass = "yellow-button zimmerwechsel-btn";
+        } else {
+          const zi = k.split('_')[0];
+          label = `Zi${zi} Bett frei`;
+          btnClass = "yellow-button zimmerwechsel-btn frei pulsing-green-slow";
+        }
+        html += `<button class="${btnClass}" onclick="doWechsel('${k}')">${label}</button>`;
+      }
+    }
+    html += `
+        </div>
+      </div>
+    `;
+    overlay(html);
+    }
+  }
+  function doWechsel(target) {
+    const tmp = patientData[wechselBuffer];
+    patientData[wechselBuffer] = patientData[target];
+    patientData[target] = tmp;
+    localStorage.setItem('patientData', JSON.stringify(patientData));
+    renderMatrix(); renderOverview(); closeOverlay();
+  }
+
+  // Formular öffnen / schließen
+  function openEditForm(key, zimmer, platz) {
+    currentEditKey = key;
+    const d = patientData[key] || {};
+    document.getElementById('formHeader').textContent =
+      `Zi ${zimmer}, ${zimmerConfig[zimmer]===2?(platz===0?'Fenster':'Wand'):'Bett'}`;
+    document.getElementById('inputLastName').value = d.lastName || '';
+    document.getElementById('inputFirstName').value = d.firstName || '';
+    // Aufnahme-Datum: Nur bei leerem Bett auf heute setzen
+    if (!d.lastName && !d.firstName && !d.admission) {
+      document.getElementById('inputAdmission').value = new Date().toISOString().split('T')[0];
+    } else {
+      document.getElementById('inputAdmission').value = d.admission || '';
+    }
+    document.getElementById('inputDischarge').value = d.discharge || '';
+    document.getElementById('inputDiagnosis').value = d.diagnosis || '';
+    updatePflegekraftDropdown();
+    document.getElementById('inputCareDropdown').value = d.care || '';
+    document.getElementById('inputEval').value = d.eval || '';
+    document.getElementById('inputDiet').value = d.diet || '';
+    document.getElementById('inputInfo').value = d.info || '';
+    document.getElementById('inputGroup').value = d.group || '';
+    document.getElementById('editForm').style.display = 'block';
+    showFormOverlay();
+  }
+  function hideForm() {
+    document.getElementById('editForm').style.display = 'none';
+  }
+  function showFormOverlay() {
+    document.getElementById('formOverlay').style.display = 'flex';
+  }
+  function hideFormOverlay() {
+    document.getElementById('formOverlay').style.display = 'none';
+  }
+  document.getElementById('formOverlay').addEventListener('click', function (e) {
+    if (e.target.id === 'formOverlay') {
+      hideFormOverlay();
+    }
+  });
+
+  // Speichern mit Validierung
+  function savePatientData() {
+    const ln = document.getElementById('inputLastName').value.trim();
+    if (!ln) {
+      overlay('<p>Nachname ist erforderlich.</p>');
+      return;
+    }
+    const data = {
+      lastName: document.getElementById('inputLastName').value.trim(),
+      firstName: document.getElementById('inputFirstName').value.trim(),
+      admission: document.getElementById('inputAdmission').value,
+      discharge: document.getElementById('inputDischarge').value,
+      diagnosis: document.getElementById('inputDiagnosis').value.trim(),
+      care: document.getElementById('inputCareDropdown').value,
+      eval: document.getElementById('inputEval').value,
+      diet: document.getElementById('inputDiet').value.trim(),
+      info: document.getElementById('inputInfo').value.trim(),
+      group: document.getElementById('inputGroup').value
+    };
+    patientData[currentEditKey] = data;
+    localStorage.setItem('patientData', JSON.stringify(patientData));
+    renderMatrix();
+    renderOverview();
+    hideFormOverlay(); // <-- nur diese Zeile!
+  }
+
+  // Übersicht rendern
+  function renderOverview() {
+    container.innerHTML = '';
+
+    // Zi 00 Karte (Überschrift)
+    const zi16 = sortedZimmer.find(([z]) => z === "16");
+    if (zi16) {
+      const [zimmer, plaetze] = ["00", zi16[1]];
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.background = '#1f1f1f'; // Sidebar-Grau
+
+      // Titel links
+      const title = document.createElement('div');
+      title.className = 'room-title';
+      title.textContent = `Zi ${zimmer}`;
+      title.style.color = '#1f1f1f'; // gleiche Farbe wie card.style.background
+      card.appendChild(title);
+
+      // Wrapper für Label-Boxen
+      const infoWrapper = document.createElement('div');
+      infoWrapper.className = 'info-wrapper';
+      infoWrapper.style.flexDirection = 'column';
+      infoWrapper.style.gap = '6px';
+
+      // Eine Zeile mit allen Label-Boxen nebeneinander
+      const labelRow = document.createElement('div');
+      labelRow.style.display = 'flex';
+      labelRow.style.flexDirection = 'row';
+      labelRow.style.gap = '12px';
+
+      const labels = [
+        { label: 'Name', width: '168px' }, // 20% breiter
+        { label: 'Diag.', width: '98px' },
+        { label: 'Aufnahme', width: '98px' },
+        { label: 'Entlassung', width: '98px' },
+        { label: 'Pflegekraft', width: '98px' },
+        { label: 'Kostform', width: '98px' },
+        { label: 'Info', width: '280px' }
+      ];
+
+      labels.forEach(l => {
+        const labelBox = document.createElement('div');
+        labelBox.style.width = l.width;
+        labelBox.style.height = '19px';
+        labelBox.style.borderRadius = '6px';
+        labelBox.style.padding = '2px 10px';
+        labelBox.style.boxShadow = '0 1px 4px rgba(0,0,0,0.2)';
+        labelBox.style.border = '1px solid #666';
+        labelBox.style.background = '#f1c40f';
+        labelBox.style.color = '#1f1f1f';
+        labelBox.style.display = 'flex';
+        labelBox.style.alignItems = 'center';
+        labelBox.style.justifyContent = 'center';
+        labelBox.style.fontWeight = 'bold';
+        labelBox.style.whiteSpace = 'nowrap';
+        labelBox.style.overflow = 'hidden';
+        labelBox.style.textOverflow = 'ellipsis';
+        labelBox.textContent = l.label;
+        labelRow.appendChild(labelBox);
+      });
+
+      infoWrapper.appendChild(labelRow);
+      card.appendChild(infoWrapper);
+      container.appendChild(card);
+    }
+    // --- Ende Zi 00 ---
+
+    sortedZimmer.forEach(([zimmer, plaetze]) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      // Titel links
+      const title = document.createElement('div');
+      title.className = 'room-title';
+      title.textContent = `Zi ${zimmer}`;
+      card.appendChild(title);
+
+      // Wrapper für alle Patienten-Zeilen
+      const infoWrapper = document.createElement('div');
+      infoWrapper.className = 'info-wrapper';
+      infoWrapper.style.flexDirection = 'column'; // Patienten untereinander
+      infoWrapper.style.gap = '6px';
+
+      // Für jeden Patienten eine Zeile mit allen Infos nebeneinander
+      for (let i = 0; i < plaetze; i++) {
+        const key = `${zimmer}_${i}`;
+        const d = patientData[key];
+
+        // Zeile für einen Patienten
+        const patientRow = document.createElement('div');
+        patientRow.style.display = 'flex';
+        patientRow.style.flexDirection = 'row';
+        patientRow.style.gap = '12px';
+
+        // Name/Bett frei in gelber Box, Rest wie gehabt
+        const infos = [
+          { value: d ? `${d.lastName}, ${d.firstName}` : 'Bett frei', isName: true, width: '168px' }, // 140px * 1.2 = 168px
+          { value: d ? (d.diagnosis || '') : '', bg: '#444', width: '98px' },
+          { value: d ? formatDateDM(d.admission) : '', bg: '#444', width: '98px' },
+          { value: d ? formatDateDM(d.discharge) : '', bg: '#444', width: '98px', isDischarge: true, raw: d ? d.discharge : '' },
+          { value: d ? (d.care || '') : '', bg: '#444', width: '98px' },
+          { value: d ? (d.diet || '') : '', bg: '#444', width: '98px' },
+          { value: d ? (d.info || '') : '', bg: '#444', width: '280px' }
+        ];
+
+        infos.forEach((info, idx) => {
+          const infoBox = document.createElement('div');
+          infoBox.style.width = info.width;
+         infoBox.style.height = '15px'; // 10% kleiner
+          infoBox.style.borderRadius = '6px';
+          infoBox.style.padding = '2px 10px';
+          infoBox.style.boxShadow = '0 1px 4px rgba(0,0,0,0.2)';
+          infoBox.style.border = '1px solid #666';
+          infoBox.style.textAlign = 'left';
+          infoBox.style.whiteSpace = 'nowrap';
+          infoBox.style.overflow = 'hidden';
+          infoBox.style.textOverflow = 'ellipsis';
+          infoBox.style.display = 'flex';
+          infoBox.style.alignItems = 'center';
+
+          if (info.isName) {
+            infoBox.classList.add('yellow-box');
+            if (info.value === 'Bett frei') {
+              // Bett frei: grau & weiß
+              infoBox.style.background = '#444';
+              infoBox.style.color = '#fff';
+              infoBox.style.fontWeight = 'normal';
+            } else {
+              // Belegt: gelb & schwarz, fett
+              infoBox.style.background = '#f1c40f';
+              infoBox.style.color = '#2c2c2c';
+              infoBox.style.fontWeight = 'bold';
+            }
+            infoBox.innerHTML = info.value;
+          } else {
+            infoBox.style.background = info.bg;
+            infoBox.style.color = '#fff';
+
+            // Pulsieren, wenn Entlassdatum heute oder älter
+            if (info.isDischarge && info.raw) {
+              const today = new Date();
+              today.setHours(0,0,0,0);
+              const dischargeDate = new Date(info.raw);
+              dischargeDate.setHours(0,0,0,0);
+              if (dischargeDate <= today) {
+                infoBox.classList.add('pulsing-red-slow');
+              }
+            }
+
+            // Wenn leer, dann ein "-" in Hintergrundfarbe (quasi unsichtbar)
+            if (!info.value) {
+              infoBox.innerHTML = `<span style="color:${info.bg}">-</span>`;
+            } else {
+              infoBox.innerHTML = info.value;
+            }
+          }
+          patientRow.appendChild(infoBox);
+        });
+
+        infoWrapper.appendChild(patientRow);
+      }
+
+      card.appendChild(infoWrapper);
+      container.appendChild(card);
+    });
+  }
+
+  // Pflegekraft-Dropdown auffüllen
+  function updatePflegekraftDropdown() {
+    const dd = document.getElementById('inputCareDropdown');
+    dd.innerHTML = '';
+    mitarbeiter.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = m;
+      dd.appendChild(opt);
+    });
+  }
+
+  // Datum & Uhrzeit
+  function updateDateTime() {
+    const now = new Date();
+    document.getElementById('datetime').innerHTML =
+      now.toLocaleDateString('de-DE')+'<br>'+now.toLocaleTimeString('de-DE');
+  }
+  setInterval(updateDateTime,1000);
+  updateDateTime();
+
+  // Init
+  sortedZimmer.forEach(([z,p]) => {
+    for (let i=0; i<p; i++) patientData[`${z}_${i}`] = patientData[`${z}_${i}`]||null;
+  });
+  renderOverview();
+  showSection('overview');
+
+  function onDietSelectChange() {
+  const sel = document.getElementById('inputDietSelect');
+  const txt = document.getElementById('inputDiet');
+  if (sel.value === 'FREITEXT') {
+    txt.disabled = false;
+    txt.value = '';
+    txt.focus();
+  } else {
+    txt.disabled = true;
+    txt.value = sel.value;
+  }
+}
+</script>
+</body>
+</html>
